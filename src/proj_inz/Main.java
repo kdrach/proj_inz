@@ -24,6 +24,8 @@ public class Main extends JFrame {
     JButton processingButton;
     JScrollPane scrollPane;
     JLabel imgLabel;
+    static boolean isGrey = false;
+    static int mask;
 
     public static int chooseMask() {  //panel wyboru opcji maski
         String[] buttons = {"3x3", "5x5", "9x9"};
@@ -33,11 +35,14 @@ public class Main extends JFrame {
 
         switch (value) {
             case 0:
+                mask = 3;
                 return 3;
             case 1:
+                mask = 5;
                 return 5;
 
             case 2:
+                mask = 9;
                 return 9;
 
         }
@@ -132,11 +137,11 @@ public class Main extends JFrame {
     }
 
     private static void Processing(BufferedImage img) {
-      
+
         int w = img.getWidth(null);
         int h = img.getHeight(null);
         int maskSize = chooseMask();
-      
+
         filter(img, maskSize, w, h);
 
     }
@@ -145,50 +150,93 @@ public class Main extends JFrame {
         ColorSpace cs = ColorSpace.getInstance(ColorSpace.CS_GRAY);
         ColorConvertOp op = new ColorConvertOp(cs, null);
         op.filter(img, img);
-
+        isGrey = true;
     }
 
     public static void filter(BufferedImage img, int maskSize, int width, int height) {
-
         int xMin, xMax, yMin, yMax;
         int[] a = new int[maskSize * maskSize];
-        int[] red = new int[maskSize * maskSize]; //tablice w których zapisze warości pikseli
-        int[] green = new int[maskSize * maskSize];
-        int[] blue = new int[maskSize * maskSize];
 
-        for (int x = 0; x < width; x++) { //przeglądanie całego obrazu
-            for (int y = 0; y < height; y++) {
-                int counter = 0;
-                xMin = x - (maskSize / 2); // tworzę kwadracik z maski gdzie nasz piksel będzie pośrodku
-                xMax = x + (maskSize / 2);
-                yMin = y - (maskSize / 2);
-                yMax = y + (maskSize / 2);
+        if (!isGrey) {
 
-                int rgb;
-                for (int r = yMin; r <= yMax; r++) { //przeglądanie obrazu maską
-                    for (int c = xMin; c <= xMax; c++) {
-                        if (r < 0 || r >= height || c < 0 || c >= width) { //pomijam gdyż chodzi o krawędzie obrazu
+            int[] red = new int[maskSize * maskSize]; //tablice w których zapisze warości pikseli
+            int[] green = new int[maskSize * maskSize];
+            int[] blue = new int[maskSize * maskSize];
+            for (int x = 0; x < width; x++) { //przeglądanie całego obrazu
+                for (int y = 0; y < height; y++) {
+                    int counter = 0;
+                    xMin = x - (maskSize / 2); // tworzę kwadracik z maski gdzie nasz piksel będzie pośrodku
+                    xMax = x + (maskSize / 2);
+                    yMin = y - (maskSize / 2);
+                    yMax = y + (maskSize / 2);
 
-                            continue;
-                        } else {
+                    int rgb;
+                    for (int r = yMin; r <= yMax; r++) { //przeglądanie obrazu maską
+                        for (int c = xMin; c <= xMax; c++) {
+                            if (r < 0 || r >= height || c < 0 || c >= width) { //pomijam gdyż chodzi o krawędzie obrazu
 
-                            rgb = img.getRGB(c, r);
-                            a[counter] = (rgb & 0xff000000) >>> 24;
-                            red[counter] = (rgb >> 16) & 0xff;
-                            green[counter] = (rgb >> 8) & 0xff;
-                            blue[counter] = (rgb) & 0xFF;
-                            counter++;
+                                continue;
+                            } else {
+
+                                rgb = img.getRGB(c, r);
+                                a[counter] = (rgb & 0xff000000) >>> 24;
+                                red[counter] = (rgb >> 16) & 0xff;
+                                green[counter] = (rgb >> 8) & 0xff;
+                                blue[counter] = (rgb) & 0xFF;
+                                counter++;
+                            }
                         }
+
                     }
+                    sortRGB(red, green, blue);
+                    int index = median(counter);
+                    int RGB = blue[index] | (green[index] << 8) | (red[index] << 16) | (a[index] << 24);
+                    img.setRGB(x, y, RGB);
 
                 }
-                sortRGB(red, green, blue);
-                int index = median(counter);
-                int RGB = blue[index] | (green[index] << 8) | (red[index] << 16) | (a[index] << 24);
-                img.setRGB(x, y, RGB);
-
             }
+        } else {
+            for (int x = 0; x < width; x++) { //przeglądanie całego obrazu
+                for (int y = 0; y < height; y++) {
+                    int counter = 0;
+                    int[] grey = new int[maskSize * maskSize];
+                    xMin = x - (maskSize / 2); // tworzę kwadracik z maski gdzie nasz piksel będzie pośrodku
+                    xMax = x + (maskSize / 2);
+                    yMin = y - (maskSize / 2);
+                    yMax = y + (maskSize / 2);
+
+                    int rgb;
+                    for (int r = yMin; r <= yMax; r++) { //przeglądanie obrazu maską
+                        for (int c = xMin; c <= xMax; c++) {
+                            if (r < 0 || r >= height || c < 0 || c >= width) { //pomijam gdyż chodzi o krawędzie obrazu
+
+                                continue;
+                            } else {
+
+                                rgb = img.getRGB(c, r);
+                                a[counter] = (rgb & 0xff000000) >>> 24;
+                                int g1 = (rgb >> 16) & 0xFF;
+                                int g2 = (rgb >> 8) & 0xFF;
+                                int g3 = (rgb & 0xFF);
+
+                                grey[counter] = (g1+g2+g3)/3; //pobieram odcien szarosci ze wzoru (r+g+b)/3 
+
+                                counter++;
+                            }
+                        }
+
+                    }
+                   
+                    int index = median(counter);
+                    System.out.println(grey[index]);
+                    int RGB = grey[index] | (grey[index] << 8) | (grey[index] << 16) | (a[index] << 24);
+                    img.setRGB(x, y, RGB);
+
+                }
+            }
+
         }
+
         write(img);
     }
 
@@ -207,7 +255,7 @@ public class Main extends JFrame {
         } else {
             index = tabLenght / 2;
         }
-  return index;
+        return index;
 
     }
 
@@ -215,7 +263,7 @@ public class Main extends JFrame {
     {
 
         int index = filePath.lastIndexOf('.');
-        String path = filePath.substring(0, index) + "-output.png";
+        String path = filePath.substring(0, index) + "-output " + mask + "x" + mask + ".png";
 
         File outputfile = new File(path);
         try {
